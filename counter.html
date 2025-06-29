@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Release Event Counter</title>
+  <style>
+    body { font-family: sans-serif; padding: 20px; }
+    button { margin: 5px; padding: 10px 20px; font-size: 16px; }
+    table { width: 100%; margin-top: 20px; border-collapse: collapse; }
+    th, td { padding: 10px; border: 1px solid #ccc; text-align: left; }
+    .delete-button { background-color: #e74c3c; color: white; border: none; padding: 5px 10px; cursor: pointer; }
+    #counterContainer {
+      text-align: right;
+      margin-bottom: 10px;
+      font-weight: bold;
+    }
+    .counter-line {
+      margin: 5px 0;
+    }
+  </style>
+</head>
+<body>
+  <h1>Release Event Counter</h1>
+  <button onclick="promptEvent('Delayed Rollout')">Delayed Rollout</button>
+  <button onclick="promptEvent('Aborted Release')">Aborted Release</button>
+
+  <div id="counterContainer">
+    <div class="counter-line">
+      Delayed Rollout - Total: <span id="delayedTotal">0</span> |
+      iOS: <span id="delayedIOS">0</span> |
+      Android: <span id="delayedAndroid">0</span>
+    </div>
+    <div class="counter-line">
+      Roll Forward - Total: <span id="rollforwardTotal">0</span> |
+      iOS: <span id="rollforwardIOS">0</span> |
+      Android: <span id="rollforwardAndroid">0</span>
+    </div>
+    <div class="counter-line">
+      Hotfix - Total: <span id="hotfixTotal">0</span> |
+      iOS: <span id="hotfixIOS">0</span> |
+      Android: <span id="hotfixAndroid">0</span>
+    </div>
+  </div>
+
+  <table>
+    <thead>
+      <tr>
+        <th>Timestamp</th>
+        <th>Event Type</th>
+        <th>Platform</th>
+        <th>Version</th>
+        <th>Mitigation</th>
+        <th>Delete</th>
+      </tr>
+    </thead>
+    <tbody id="eventTableBody">
+    </tbody>
+  </table>
+
+  <script>
+    function promptEvent(eventType) {
+      const platform = prompt("Enter platform name (e.g., Android, iOS, Web):");
+      const version = prompt("Enter version name or number:");
+      if (platform && version) {
+        let hotfix = '-';
+        if (eventType === 'Aborted Release') {
+          hotfix = prompt("Hotfix? Roll forward?") || '-';
+        }
+        addEvent(eventType, platform, version, hotfix);
+      }
+    }
+
+    function addEvent(type, platform = '-', version = '-', hotfix = '-') {
+      const timestamp = new Date().toLocaleString();
+      const tableBody = document.getElementById('eventTableBody');
+      const row = createTableRow({ type, timestamp, platform, version, hotfix });
+
+      tableBody.appendChild(row);
+      saveEvent(type, timestamp, platform, version, hotfix);
+      sortTableByVersion();
+      updatePlatformCounters();
+    }
+
+    function createTableRow(event) {
+      const row = document.createElement('tr');
+
+      const timestampCell = document.createElement('td');
+      const typeCell = document.createElement('td');
+      const platformCell = document.createElement('td');
+      const versionCell = document.createElement('td');
+      const hotfixCell = document.createElement('td');
+      const deleteCell = document.createElement('td');
+      const deleteButton = document.createElement('button');
+
+      timestampCell.textContent = event.timestamp;
+      typeCell.textContent = event.type;
+      platformCell.textContent = event.platform || '-';
+      versionCell.textContent = event.version || '-';
+      hotfixCell.textContent = event.hotfix || '-';
+
+      deleteButton.textContent = 'Delete';
+      deleteButton.className = 'delete-button';
+      deleteButton.onclick = () => {
+        row.remove();
+        deleteEvent(event.timestamp);
+      };
+      deleteCell.appendChild(deleteButton);
+
+      row.appendChild(timestampCell);
+      row.appendChild(typeCell);
+      row.appendChild(platformCell);
+      row.appendChild(versionCell);
+      row.appendChild(hotfixCell);
+      row.appendChild(deleteCell);
+
+      return row;
+    }
+
+    function saveEvent(type, timestamp, platform, version, hotfix) {
+      const events = JSON.parse(localStorage.getItem('releaseEvents') || '[]');
+      events.push({ type, timestamp, platform, version, hotfix });
+      localStorage.setItem('releaseEvents', JSON.stringify(events));
+    }
+
+    function deleteEvent(timestamp) {
+      const events = JSON.parse(localStorage.getItem('releaseEvents') || '[]');
+      const filtered = events.filter(event => event.timestamp !== timestamp);
+      localStorage.setItem('releaseEvents', JSON.stringify(filtered));
+      loadEvents(); // Re-render table and update counters
+    }
+
+    function loadEvents() {
+      const events = JSON.parse(localStorage.getItem('releaseEvents') || '[]');
+      const tableBody = document.getElementById('eventTableBody');
+      tableBody.innerHTML = ''; // Clear table
+
+      events.forEach(event => {
+        const row = createTableRow(event);
+        tableBody.appendChild(row);
+      });
+
+      sortTableByVersion();
+      updatePlatformCounters();
+    }
+
+    function sortTableByVersion() {
+      const tableBody = document.getElementById('eventTableBody');
+      const rows = Array.from(tableBody.rows);
+
+      rows.sort((a, b) => {
+        const versionA = a.cells[3].textContent.trim();
+        const versionB = b.cells[3].textContent.trim();
+
+        const numA = parseFloat(versionA.replace(/[^\d.]/g, ''));
+        const numB = parseFloat(versionB.replace(/[^\d.]/g, ''));
+
+        if (!isNaN(numA) && !isNaN(numB)) {
+          return numA - numB;
+        }
+        return versionA.localeCompare(versionB, undefined, { numeric: true });
+      });
+
+      rows.forEach(row => tableBody.appendChild(row));
+    }
+
+    function updatePlatformCounters() {
+      const events = JSON.parse(localStorage.getItem('releaseEvents') || '[]');
+
+      let delayedTotal = 0, delayedIOS = 0, delayedAndroid = 0;
+      let hotfixTotal = 0, hotfixIOS = 0, hotfixAndroid = 0;
+      let rollTotal = 0, rollIOS = 0, rollAndroid = 0;
+
+      events.forEach(event => {
+        const platform = (event.platform || '').toLowerCase();
+        const isIOS = platform === 'ios';
+        const isAndroid = platform === 'android';
+
+        if (event.type === 'Delayed Rollout') {
+          delayedTotal++;
+          if (isIOS) delayedIOS++;
+          if (isAndroid) delayedAndroid++;
+        }
+
+        if (event.type === 'Aborted Release') {
+          hotfixTotal++;
+          if (isIOS) hotfixIOS++;
+          if (isAndroid) hotfixAndroid++;
+        }
+
+        if (
+          event.type === 'Roll Forward' ||
+          (event.hotfix || '').toLowerCase() === 'roll forward'
+        ) {
+          rollTotal++;
+          if (isIOS) rollIOS++;
+          if (isAndroid) rollAndroid++;
+        }
+      });
+
+      document.getElementById('delayedTotal').textContent = delayedTotal;
+      document.getElementById('delayedIOS').textContent = delayedIOS;
+      document.getElementById('delayedAndroid').textContent = delayedAndroid;
+
+      document.getElementById('hotfixTotal').textContent = hotfixTotal;
+      document.getElementById('hotfixIOS').textContent = hotfixIOS;
+      document.getElementById('hotfixAndroid').textContent = hotfixAndroid;
+
+      document.getElementById('rollforwardTotal').textContent = rollTotal;
+      document.getElementById('rollforwardIOS').textContent = rollIOS;
+      document.getElementById('rollforwardAndroid').textContent = rollAndroid;
+    }
+
+    window.onload = loadEvents;
+  </script>
+</body>
+</html>
