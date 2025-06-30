@@ -17,8 +17,9 @@
 <body>
   <h1>Release Event Counter</h1>
   <button onclick="promptEvent('Delayed Rollout')">Delayed Rollout</button>
-  <button onclick="promptEvent('Aborted Release')">Aborted Release</button>
+  <button onclick="promptEvent('Hotfix')">Hotfix</button>
   <button onclick="promptEvent('Roll Forward')">Roll Forward</button>
+  <button onclick="promptEvent('Aborted Release')">Aborted Release</button>
 
   <div id="counterContainer">
     <div class="counter-line">
@@ -54,20 +55,11 @@
 
   <script>
     function promptEvent(eventType) {
-      const platform = prompt("Enter platform name (e.g., Android, iOS):");
-      const version = prompt("Enter version name or number:");
-
+      const platform = prompt("Enter platform (Android / iOS):");
+      const version = prompt("Enter version:");
       if (!platform || !version) return;
 
-      let hotfix = '-';
-      if (eventType === 'Aborted Release') {
-        hotfix = prompt("Mitigation type (hotfix / roll forward):") || '-';
-      } else if (eventType === 'Roll Forward') {
-        hotfix = 'roll forward';
-        eventType = 'Aborted Release'; // stored as Aborted Release with roll forward label
-      }
-
-      addEvent(eventType, platform, version, hotfix);
+      addEvent(eventType, platform, version, '-');
     }
 
     function addEvent(type, platform = '-', version = '-', hotfix = '-') {
@@ -93,9 +85,9 @@
 
       timestampCell.textContent = event.timestamp;
       typeCell.textContent = event.type;
-      platformCell.textContent = event.platform || '-';
-      versionCell.textContent = event.version || '-';
-      hotfixCell.textContent = event.hotfix || '-';
+      platformCell.textContent = event.platform;
+      versionCell.textContent = event.version;
+      hotfixCell.textContent = event.hotfix;
 
       deleteButton.textContent = 'Delete';
       deleteButton.className = 'delete-button';
@@ -132,12 +124,7 @@
       const events = JSON.parse(localStorage.getItem('releaseEvents') || '[]');
       const tableBody = document.getElementById('eventTableBody');
       tableBody.innerHTML = '';
-
-      events.forEach(event => {
-        const row = createTableRow(event);
-        tableBody.appendChild(row);
-      });
-
+      events.forEach(event => tableBody.appendChild(createTableRow(event)));
       sortTableByVersion();
       updatePlatformCounters();
     }
@@ -145,26 +132,19 @@
     function sortTableByVersion() {
       const tableBody = document.getElementById('eventTableBody');
       const rows = Array.from(tableBody.rows);
-
       rows.sort((a, b) => {
         const versionA = a.cells[3].textContent.trim();
         const versionB = b.cells[3].textContent.trim();
-
         const numA = parseFloat(versionA.replace(/[^\d.]/g, ''));
         const numB = parseFloat(versionB.replace(/[^\d.]/g, ''));
-
-        if (!isNaN(numA) && !isNaN(numB)) {
-          return numA - numB;
-        }
+        if (!isNaN(numA) && !isNaN(numB)) return numA - numB;
         return versionA.localeCompare(versionB, undefined, { numeric: true });
       });
-
       rows.forEach(row => tableBody.appendChild(row));
     }
 
     function updatePlatformCounters() {
       const events = JSON.parse(localStorage.getItem('releaseEvents') || '[]');
-
       let delayedTotal = 0, delayedIOS = 0, delayedAndroid = 0;
       let hotfixTotal = 0, hotfixIOS = 0, hotfixAndroid = 0;
       let rollTotal = 0, rollIOS = 0, rollAndroid = 0;
@@ -180,13 +160,13 @@
           if (isAndroid) delayedAndroid++;
         }
 
-        if (event.type === 'Aborted Release' && (event.hotfix || '').toLowerCase() === 'hotfix') {
+        if (event.type === 'Hotfix') {
           hotfixTotal++;
           if (isIOS) hotfixIOS++;
           if (isAndroid) hotfixAndroid++;
         }
 
-        if (event.type === 'Aborted Release' && (event.hotfix || '').toLowerCase() === 'roll forward') {
+        if (event.type === 'Roll Forward') {
           rollTotal++;
           if (isIOS) rollIOS++;
           if (isAndroid) rollAndroid++;
