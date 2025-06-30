@@ -10,20 +10,15 @@
     table { width: 100%; margin-top: 20px; border-collapse: collapse; }
     th, td { padding: 10px; border: 1px solid #ccc; text-align: left; }
     .delete-button { background-color: #e74c3c; color: white; border: none; padding: 5px 10px; cursor: pointer; }
-    #counterContainer {
-      text-align: right;
-      margin-bottom: 10px;
-      font-weight: bold;
-    }
-    .counter-line {
-      margin: 5px 0;
-    }
+    #counterContainer { text-align: right; margin-bottom: 10px; font-weight: bold; }
+    .counter-line { margin: 5px 0; }
   </style>
 </head>
 <body>
   <h1>Release Event Counter</h1>
   <button onclick="promptEvent('Delayed Rollout')">Delayed Rollout</button>
   <button onclick="promptEvent('Aborted Release')">Aborted Release</button>
+  <button onclick="promptEvent('Roll Forward')">Roll Forward</button>
 
   <div id="counterContainer">
     <div class="counter-line">
@@ -54,29 +49,32 @@
         <th>Delete</th>
       </tr>
     </thead>
-    <tbody id="eventTableBody">
-    </tbody>
+    <tbody id="eventTableBody"></tbody>
   </table>
 
   <script>
     function promptEvent(eventType) {
-      const platform = prompt("Enter platform name (e.g., Android, iOS, Web):");
+      const platform = prompt("Enter platform name (e.g., Android, iOS):");
       const version = prompt("Enter version name or number:");
-      if (platform && version) {
-        let hotfix = '-';
-        if (eventType === 'Aborted Release') {
-          hotfix = prompt("Hotfix? Roll forward?") || '-';
-        }
-        addEvent(eventType, platform, version, hotfix);
+
+      if (!platform || !version) return;
+
+      let hotfix = '-';
+      if (eventType === 'Aborted Release') {
+        hotfix = prompt("Mitigation type (hotfix / roll forward):") || '-';
+      } else if (eventType === 'Roll Forward') {
+        hotfix = 'roll forward';
+        eventType = 'Aborted Release'; // stored as Aborted Release with roll forward label
       }
+
+      addEvent(eventType, platform, version, hotfix);
     }
 
     function addEvent(type, platform = '-', version = '-', hotfix = '-') {
       const timestamp = new Date().toLocaleString();
-      const tableBody = document.getElementById('eventTableBody');
       const row = createTableRow({ type, timestamp, platform, version, hotfix });
 
-      tableBody.appendChild(row);
+      document.getElementById('eventTableBody').appendChild(row);
       saveEvent(type, timestamp, platform, version, hotfix);
       sortTableByVersion();
       updatePlatformCounters();
@@ -127,13 +125,13 @@
       const events = JSON.parse(localStorage.getItem('releaseEvents') || '[]');
       const filtered = events.filter(event => event.timestamp !== timestamp);
       localStorage.setItem('releaseEvents', JSON.stringify(filtered));
-      loadEvents(); // Re-render table and update counters
+      loadEvents();
     }
 
     function loadEvents() {
       const events = JSON.parse(localStorage.getItem('releaseEvents') || '[]');
       const tableBody = document.getElementById('eventTableBody');
-      tableBody.innerHTML = ''; // Clear table
+      tableBody.innerHTML = '';
 
       events.forEach(event => {
         const row = createTableRow(event);
@@ -182,16 +180,13 @@
           if (isAndroid) delayedAndroid++;
         }
 
-        if (event.type === 'Aborted Release') {
+        if (event.type === 'Aborted Release' && (event.hotfix || '').toLowerCase() === 'hotfix') {
           hotfixTotal++;
           if (isIOS) hotfixIOS++;
           if (isAndroid) hotfixAndroid++;
         }
 
-        if (
-          event.type === 'Roll Forward' ||
-          (event.hotfix || '').toLowerCase() === 'roll forward'
-        ) {
+        if (event.type === 'Aborted Release' && (event.hotfix || '').toLowerCase() === 'roll forward') {
           rollTotal++;
           if (isIOS) rollIOS++;
           if (isAndroid) rollAndroid++;
