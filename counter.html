@@ -17,8 +17,6 @@
 <body>
   <h1>Release Event Counter</h1>
   <button onclick="promptEvent('Delayed Rollout')">Delayed Rollout</button>
-  <button onclick="promptEvent('Hotfix')">Hotfix</button>
-  <button onclick="promptEvent('Roll Forward')">Roll Forward</button>
   <button onclick="promptEvent('Aborted Release')">Aborted Release</button>
 
   <div id="counterContainer">
@@ -59,7 +57,12 @@
       const version = prompt("Enter version:");
       if (!platform || !version) return;
 
-      addEvent(eventType, platform, version, '-');
+      let mitigation = '-';
+      if (eventType === 'Aborted Release') {
+        mitigation = prompt("Mitigation type (hotfix / roll forward):")?.trim().toLowerCase() || '-';
+      }
+
+      addEvent(eventType, platform, version, mitigation);
     }
 
     function addEvent(type, platform = '-', version = '-', hotfix = '-') {
@@ -160,16 +163,16 @@
           if (isAndroid) delayedAndroid++;
         }
 
-        if (event.type === 'Hotfix') {
-          hotfixTotal++;
-          if (isIOS) hotfixIOS++;
-          if (isAndroid) hotfixAndroid++;
-        }
-
-        if (event.type === 'Roll Forward') {
-          rollTotal++;
-          if (isIOS) rollIOS++;
-          if (isAndroid) rollAndroid++;
+        if (event.type === 'Aborted Release') {
+          if (event.hotfix === 'hotfix') {
+            hotfixTotal++;
+            if (isIOS) hotfixIOS++;
+            if (isAndroid) hotfixAndroid++;
+          } else if (event.hotfix === 'roll forward') {
+            rollTotal++;
+            if (isIOS) rollIOS++;
+            if (isAndroid) rollAndroid++;
+          }
         }
       });
 
